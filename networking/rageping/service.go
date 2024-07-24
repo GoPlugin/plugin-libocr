@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	"github.com/smartcontractkit/libocr/ragep2p"
-	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/ragep2p"
+	ragetypes "github.com/goplugin/plugin-libocr/ragep2p/types"
 
 	unsafeRand "math/rand"
 )

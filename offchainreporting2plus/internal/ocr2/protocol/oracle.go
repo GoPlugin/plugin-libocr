@@ -5,11 +5,11 @@ import (
 	"fmt"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/internal/config/ocr2config"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/smartcontractkit/libocr/subprocesses"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/config/ocr2config"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/subprocesses"
 )
 
 const futureMessageBufferSize = 10 // big enough for a couple of full rounds of repgen protocol

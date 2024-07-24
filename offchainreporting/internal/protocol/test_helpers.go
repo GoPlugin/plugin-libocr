@@ -1,6 +1,6 @@
 package protocol
 
-import "github.com/smartcontractkit/libocr/commontypes"
+import "github.com/goplugin/plugin-libocr/commontypes"
 
 // Used only for testing
 type XXXUnknownMessageType struct{}

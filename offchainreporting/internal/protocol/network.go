@@ -3,7 +3,7 @@ package protocol
 import (
 	"log"
 
-	"github.com/smartcontractkit/libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/commontypes"
 )
 
 // NetworkSender sends messages to other oracles

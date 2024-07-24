@@ -3,10 +3,10 @@ package managed
 import (
 	"context"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/internal/config/netconfig"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/config/netconfig"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
 )
 
 // RunManagedBootstrapper runs a "managed" bootstrapper. It handles

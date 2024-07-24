@@ -3,7 +3,7 @@ package protocol
 import (
 	"context"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
 )
 
 type PacemakerState struct {

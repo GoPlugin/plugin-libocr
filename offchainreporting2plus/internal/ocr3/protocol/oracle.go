@@ -6,12 +6,12 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/internal/config/ocr3config"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/smartcontractkit/libocr/subprocesses"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/config/ocr3config"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/ocr3types"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/subprocesses"
 )
 
 // RunOracle runs one oracle instance of the offchain reporting protocol and manages

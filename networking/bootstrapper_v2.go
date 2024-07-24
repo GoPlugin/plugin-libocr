@@ -5,11 +5,11 @@ import (
 	"io"
 	"sync"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-	ocr2types "github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	ocr2types "github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
+	ragetypes "github.com/goplugin/plugin-libocr/ragep2p/types"
 
-	"github.com/smartcontractkit/libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
 )
 
 var (

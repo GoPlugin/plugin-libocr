@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	"github.com/smartcontractkit/libocr/offchainreporting/internal/protocol"
-	"github.com/smartcontractkit/libocr/offchainreporting/internal/serialization"
-	"github.com/smartcontractkit/libocr/offchainreporting/internal/serialization/protobuf"
-	"github.com/smartcontractkit/libocr/offchainreporting/types"
-	"github.com/smartcontractkit/libocr/subprocesses"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/offchainreporting/internal/protocol"
+	"github.com/goplugin/plugin-libocr/offchainreporting/internal/serialization"
+	"github.com/goplugin/plugin-libocr/offchainreporting/internal/serialization/protobuf"
+	"github.com/goplugin/plugin-libocr/offchainreporting/types"
+	"github.com/goplugin/plugin-libocr/subprocesses"
 )
 
 type SerializingEndpoint struct {

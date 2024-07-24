@@ -4,9 +4,9 @@ import (
 	"math"
 	"sync"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	"github.com/smartcontractkit/libocr/ragep2p/internal/ratelimit"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/ragep2p/internal/ratelimit"
 )
 
 const tlsFactor = 1.5

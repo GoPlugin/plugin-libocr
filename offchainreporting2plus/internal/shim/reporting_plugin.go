@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
 )
 
 // LimitCheckReportingPlugin wraps another ReportingPlugin and checks that

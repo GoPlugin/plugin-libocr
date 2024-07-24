@@ -6,11 +6,11 @@ import (
 	"sync"
 
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	"github.com/smartcontractkit/libocr/offchainreporting/internal/managed"
-	"github.com/smartcontractkit/libocr/offchainreporting/types"
-	"github.com/smartcontractkit/libocr/subprocesses"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/offchainreporting/internal/managed"
+	"github.com/goplugin/plugin-libocr/offchainreporting/types"
+	"github.com/goplugin/plugin-libocr/subprocesses"
 )
 
 // OracleArgs contains the configuration and services a caller must provide, in

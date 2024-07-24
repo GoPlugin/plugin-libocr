@@ -3,10 +3,10 @@ package shim
 import (
 	"context"
 
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/internal/ocr3/protocol"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/internal/ocr3/serialization"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/ocr3types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/ocr3/protocol"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/ocr3/serialization"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/ocr3types"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
 	"google.golang.org/protobuf/proto"
 )
 

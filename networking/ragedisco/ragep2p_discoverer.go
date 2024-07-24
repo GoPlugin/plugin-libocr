@@ -8,13 +8,13 @@ import (
 	"time"
 
 	"github.com/prometheus/client_golang/prometheus"
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	nettypes "github.com/smartcontractkit/libocr/networking/types"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
-	"github.com/smartcontractkit/libocr/ragep2p"
-	ragetypes "github.com/smartcontractkit/libocr/ragep2p/types"
-	"github.com/smartcontractkit/libocr/subprocesses"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	nettypes "github.com/goplugin/plugin-libocr/networking/types"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/ragep2p"
+	ragetypes "github.com/goplugin/plugin-libocr/ragep2p/types"
+	"github.com/goplugin/plugin-libocr/subprocesses"
 )
 
 type ragep2pDiscovererState int

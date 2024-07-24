@@ -1,4 +1,4 @@
-module github.com/smartcontractkit/libocr
+module github.com/goplugin/plugin-libocr
 
 go 1.21
 

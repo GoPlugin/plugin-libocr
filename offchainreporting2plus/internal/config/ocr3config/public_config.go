@@ -8,9 +8,9 @@ import (
 	"time"
 
 	"github.com/pkg/errors"
-	"github.com/smartcontractkit/libocr/internal/byzquorum"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/internal/config"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/internal/byzquorum"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/config"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
 )
 
 // PublicConfig is the configuration disseminated through the smart contract

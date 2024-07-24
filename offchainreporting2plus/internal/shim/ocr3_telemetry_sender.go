@@ -3,10 +3,10 @@ package shim
 import (
 	"time"
 
-	"github.com/smartcontractkit/libocr/commontypes"
-	"github.com/smartcontractkit/libocr/internal/loghelper"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/internal/ocr3/serialization"
-	"github.com/smartcontractkit/libocr/offchainreporting2plus/types"
+	"github.com/goplugin/plugin-libocr/commontypes"
+	"github.com/goplugin/plugin-libocr/internal/loghelper"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/ocr3/serialization"
+	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
 )
 
 type OCR3TelemetrySender struct {
