@@ -26,19 +26,25 @@ const (
 )
 
 type bootstrapperV2 struct {
-	logger       loghelper.LoggerWithContext
-	configDigest ocr2types.ConfigDigest
-	registration io.Closer
-	state        bootstrapperState
+	peer            *concretePeerV2
+	v2peerIDs       []ragetypes.PeerID
+	v2bootstrappers []ragetypes.PeerInfo
+	logger          loghelper.LoggerWithContext
+	configDigest    ocr2types.ConfigDigest
+	registration    io.Closer
+	state           bootstrapperState
 
 	stateMu *sync.Mutex
+	f       int
 }
 
 func newBootstrapperV2(
 	logger loghelper.LoggerWithContext,
 	configDigest ocr2types.ConfigDigest,
+	peer *concretePeerV2,
 	v2peerIDs []ragetypes.PeerID,
 	v2bootstrappers []ragetypes.PeerInfo,
+	f int,
 	registration io.Closer,
 ) (*bootstrapperV2, error) {
 	logger = logger.MakeChild(commontypes.LogFields{
@@ -52,11 +58,15 @@ func newBootstrapperV2(
 	})
 
 	return &bootstrapperV2{
+		peer,
+		v2peerIDs,
+		v2bootstrappers,
 		logger,
 		configDigest,
 		registration,
 		bootstrapperUnstarted,
 		new(sync.Mutex),
+		f,
 	}, nil
 }
 

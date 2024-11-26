@@ -12,7 +12,6 @@ import (
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/ocr3/protocol/pool"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/ocr3types"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
-	"github.com/goplugin/plugin-libocr/subprocesses"
 )
 
 // Identifies an instance of the outcome generation protocol
@@ -44,12 +43,9 @@ func RunOutcomeGeneration[RI any](
 
 	restoredCert CertifiedPrepareOrCommit,
 ) {
-
 	outgen := outcomeGenerationState[RI]{
-		ctx:  ctx,
-		subs: subprocesses.Subprocesses{},
+		ctx: ctx,
 
-		chLocalEvent:                           make(chan EventToOutcomeGeneration[RI]),
 		chNetToOutcomeGeneration:               chNetToOutcomeGeneration,
 		chPacemakerToOutcomeGeneration:         chPacemakerToOutcomeGeneration,
 		chOutcomeGenerationToPacemaker:         chOutcomeGenerationToPacemaker,
@@ -69,10 +65,8 @@ func RunOutcomeGeneration[RI any](
 }
 
 type outcomeGenerationState[RI any] struct {
-	ctx  context.Context
-	subs subprocesses.Subprocesses
+	ctx context.Context
 
-	chLocalEvent                           chan EventToOutcomeGeneration[RI]
 	chNetToOutcomeGeneration               <-chan MessageToOutcomeGenerationWithSender[RI]
 	chPacemakerToOutcomeGeneration         <-chan EventToOutcomeGeneration[RI]
 	chOutcomeGenerationToPacemaker         chan<- EventToPacemaker[RI]
@@ -88,8 +82,6 @@ type outcomeGenerationState[RI any] struct {
 	reportingPlugin                        ocr3types.ReportingPlugin[RI]
 	telemetrySender                        TelemetrySender
 
-	epochCtx         context.Context
-	epochCtxCancel   context.CancelFunc
 	bufferedMessages []*MessageBuffer[RI]
 	leaderState      leaderState[RI]
 	followerState    followerState[RI]
@@ -104,9 +96,9 @@ type leaderState[RI any] struct {
 	readyToStartRound bool // TODO: explain meaning of this vs design doc
 	tRound            <-chan time.Time
 
-	query           types.Query
-	observationPool *pool.Pool[SignedObservation]
-	tGrace          <-chan time.Time
+	query        types.Query
+	observations map[commontypes.OracleID]*SignedObservation
+	tGrace       <-chan time.Time
 }
 
 type epochStartRequest[RI any] struct {
@@ -154,13 +146,11 @@ type sharedState struct {
 func (outgen *outcomeGenerationState[RI]) run(restoredCert CertifiedPrepareOrCommit) {
 	outgen.logger.Info("OutcomeGeneration: running", nil)
 
-	// Initialization
-	outgen.epochCtx, outgen.epochCtxCancel = context.WithCancel(outgen.ctx)
-
 	for i := 0; i < outgen.config.N(); i++ {
 		outgen.bufferedMessages = append(outgen.bufferedMessages, NewMessageBuffer[RI](futureMessageBufferSize))
 	}
 
+	// Initialization
 	outgen.leaderState = leaderState[RI]{
 		outgenLeaderPhaseUnknown,
 		map[commontypes.OracleID]*epochStartRequest[RI]{},
@@ -198,8 +188,6 @@ func (outgen *outcomeGenerationState[RI]) run(restoredCert CertifiedPrepareOrCom
 	chDone := outgen.ctx.Done()
 	for {
 		select {
-		case ev := <-outgen.chLocalEvent:
-			ev.processOutcomeGeneration(outgen)
 		case msg := <-outgen.chNetToOutcomeGeneration:
 			outgen.messageToOutcomeGeneration(msg)
 		case ev := <-outgen.chPacemakerToOutcomeGeneration:
@@ -220,7 +208,6 @@ func (outgen *outcomeGenerationState[RI]) run(restoredCert CertifiedPrepareOrCom
 				"e": outgen.sharedState.e,
 				"l": outgen.sharedState.l,
 			})
-			outgen.subs.Wait()
 			outgen.metrics.Close()
 			outgen.logger.Info("OutcomeGeneration: exiting", commontypes.LogFields{
 				"e": outgen.sharedState.e,
@@ -288,9 +275,6 @@ func (outgen *outcomeGenerationState[RI]) eventNewEpochStart(ev EventNewEpochSta
 		"epoch": ev.Epoch,
 	})
 
-	outgen.epochCtxCancel()
-	outgen.epochCtx, outgen.epochCtxCancel = context.WithCancel(outgen.ctx)
-
 	outgen.sharedState.e = ev.Epoch
 	outgen.sharedState.l = Leader(outgen.sharedState.e, outgen.config.N(), outgen.config.LeaderSelectionKey())
 
@@ -314,7 +298,6 @@ func (outgen *outcomeGenerationState[RI]) eventNewEpochStart(ev EventNewEpochSta
 	outgen.leaderState.phase = outgenLeaderPhaseNewEpoch
 	outgen.leaderState.epochStartRequests = map[commontypes.OracleID]*epochStartRequest[RI]{}
 	outgen.leaderState.readyToStartRound = false
-	outgen.leaderState.observationPool = pool.NewPool[SignedObservation](1) // only one observation per sender & round, and we do not need to worry about observations from the future
 	outgen.leaderState.tGrace = nil
 
 	var highestCertified CertifiedPrepareOrCommit
@@ -370,23 +353,71 @@ func (outgen *outcomeGenerationState[RI]) OutcomeCtx(seqNr uint64) ocr3types.Out
 	}
 }
 
-func callPluginFromOutcomeGenerationBackground[T any, RI any](
-	ctx context.Context,
-	logger loghelper.LoggerWithContext,
+func (outgen *outcomeGenerationState[RI]) ObservationQuorum(query types.Query) (quorum int, ok bool) {
+	if outgen.sharedState.observationQuorum != nil {
+		return *outgen.sharedState.observationQuorum, true
+	}
+
+	observationQuorum, ok := callPluginFromOutcomeGeneration[ocr3types.Quorum](
+		outgen,
+		"ObservationQuorum",
+		0, // pure function
+		outgen.OutcomeCtx(outgen.sharedState.seqNr),
+		func(ctx context.Context, outctx ocr3types.OutcomeContext) (ocr3types.Quorum, error) {
+			return outgen.reportingPlugin.ObservationQuorum(outctx, query)
+		},
+	)
+
+	if !ok {
+		return 0, false
+	}
+
+	nMinusF := outgen.config.N() - outgen.config.F
+
+	switch observationQuorum {
+	case ocr3types.QuorumFPlusOne, ocr3types.OldQuorumFPlusOne:
+		quorum = outgen.config.F + 1
+	case ocr3types.QuorumTwoFPlusOne, ocr3types.OldQuorumTwoFPlusOne:
+		quorum = 2*outgen.config.F + 1
+	case ocr3types.QuorumByzQuorum, ocr3types.OldQuorumByzQuorum:
+		quorum = outgen.config.ByzQuorumSize()
+	case ocr3types.QuorumNMinusF, ocr3types.OldQuorumNMinusF:
+		quorum = nMinusF
+	default:
+		quorum = int(observationQuorum)
+	}
+
+	if !(0 < quorum && int(quorum) <= nMinusF) {
+		outgen.logger.Error("invalid observation quorum", commontypes.LogFields{
+			"quorum":  quorum,
+			"n":       outgen.config.N(),
+			"f":       outgen.config.F,
+			"nMinusF": nMinusF,
+		})
+		return 0, false
+	}
+
+	outgen.sharedState.observationQuorum = &quorum
+
+	return quorum, true
+}
+
+func callPluginFromOutcomeGeneration[T any, RI any](
+	outgen *outcomeGenerationState[RI],
 	name string,
-	recommendedMaxDuration time.Duration,
+	maxDuration time.Duration,
 	outctx ocr3types.OutcomeContext,
 	f func(context.Context, ocr3types.OutcomeContext) (T, error),
 ) (T, bool) {
-	return callPluginFromBackground[T](
-		ctx,
-		logger,
+	return callPlugin[T](
+		outgen.ctx,
+		outgen.logger,
 		commontypes.LogFields{
 			"seqNr": outctx.SeqNr,
 			"round": outctx.Round, // nolint: staticcheck
 		},
 		name,
-		recommendedMaxDuration,
+		maxDuration,
 		func(ctx context.Context) (T, error) {
 			return f(ctx, outctx)
 		},

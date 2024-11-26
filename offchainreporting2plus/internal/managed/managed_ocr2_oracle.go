@@ -8,7 +8,6 @@ import (
 	"github.com/goplugin/plugin-libocr/commontypes"
 	"github.com/goplugin/plugin-libocr/internal/loghelper"
 	"github.com/goplugin/plugin-libocr/internal/metricshelper"
-	"github.com/goplugin/plugin-libocr/internal/util"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/config/ocr2config"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/managed/limits"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/ocr2/protocol"
@@ -63,10 +62,10 @@ func RunManagedOCR2Oracle(
 
 		configTracker,
 		database,
-		func(ctx context.Context, logger loghelper.LoggerWithContext, contractConfig types.ContractConfig) (err error, retry bool) {
+		func(ctx context.Context, contractConfig types.ContractConfig, logger loghelper.LoggerWithContext) {
 			skipResourceExhaustionChecks := localConfig.DevelopmentMode == types.EnableDangerousDevelopmentMode
 
-			fromAccount, err := contractTransmitter.FromAccount(ctx)
+			fromAccount, err := contractTransmitter.FromAccount()
 			if err != nil {
 				logger.Error("ManagedOCR2Oracle: error getting FromAccount", commontypes.LogFields{
 					"error": err,
@@ -109,20 +108,7 @@ func RunManagedOCR2Oracle(
 				"oid": oid,
 			})
 
-			maxDurationInitialization := util.NilCoalesce(sharedConfig.MaxDurationInitialization, localConfig.DefaultMaxDurationInitialization)
-			initCtx, initCancel := context.WithTimeout(ctx, maxDurationInitialization)
-			defer initCancel()
-
-			ins := loghelper.NewIfNotStopped(
-				maxDurationInitialization+protocol.ReportingPluginTimeoutWarningGracePeriod,
-				func() {
-					logger.Error("ManagedOCR2Oracle: ReportingPluginFactory.NewReportingPlugin is taking too long", commontypes.LogFields{
-						"maxDuration": maxDurationInitialization,
-					})
-				},
-			)
-
-			reportingPlugin, reportingPluginInfo, err := reportingPluginFactory.NewReportingPlugin(initCtx, types.ReportingPluginConfig{
+			reportingPlugin, reportingPluginInfo, err := reportingPluginFactory.NewReportingPlugin(types.ReportingPluginConfig{
 				sharedConfig.ConfigDigest,
 				oid,
 				sharedConfig.N(),
@@ -136,9 +122,6 @@ func RunManagedOCR2Oracle(
 				sharedConfig.MaxDurationShouldAcceptFinalizedReport,
 				sharedConfig.MaxDurationShouldTransmitAcceptedReport,
 			})
-
-			ins.Stop()
-
 			if err != nil {
 				logger.Error("ManagedOCR2Oracle: error during NewReportingPlugin()", commontypes.LogFields{
 					"error": err,
@@ -155,7 +138,7 @@ func RunManagedOCR2Oracle(
 					"error":               err,
 					"reportingPluginInfo": reportingPluginInfo,
 				})
-				return fmt.Errorf("ManagedOCR2Oracle: invalid ReportingPluginInfo"), false
+				return
 			}
 
 			maxSigLen := onchainKeyring.MaxSignatureLength()
@@ -167,7 +150,7 @@ func RunManagedOCR2Oracle(
 					"reportingPluginInfo": reportingPluginInfo,
 					"maxSigLen":           maxSigLen,
 				})
-				return fmt.Errorf("ManagedOCR2Oracle: error during limits"), false
+				return
 			}
 			binNetEndpoint, err := netEndpointFactory.NewEndpoint(
 				sharedConfig.ConfigDigest,
@@ -182,7 +165,7 @@ func RunManagedOCR2Oracle(
 					"peerIDs":         peerIDs,
 					"v2bootstrappers": v2bootstrappers,
 				})
-				return fmt.Errorf("ManagedOCR2Oracle: error during NewEndpoint"), true
+				return
 			}
 
 			// No need to binNetEndpoint.Start/Close since netEndpoint will handle that for us
@@ -192,11 +175,14 @@ func RunManagedOCR2Oracle(
 				sharedConfig.ConfigDigest,
 				binNetEndpoint,
 				childLogger,
-				registerer,
 				reportingPluginInfo.Limits,
 			)
 			if err := netEndpoint.Start(); err != nil {
-				return fmt.Errorf("ManagedOCR2Oracle: error during netEndpoint.Start(): %w", err), true
+				logger.Error("ManagedOCR2Oracle: error during netEndpoint.Start()", commontypes.LogFields{
+					"error":        err,
+					"configDigest": sharedConfig.ConfigDigest,
+				})
+				return
 			}
 			defer loghelper.CloseLogError(
 				netEndpoint,
@@ -239,13 +225,10 @@ func RunManagedOCR2Oracle(
 				reportQuorum,
 				shim.MakeOCR2TelemetrySender(chTelemetrySend, childLogger),
 			)
-
-			return nil, false
 		},
 		localConfig,
 		logger,
 		offchainConfigDigester,
-		defaultRetryParams(),
 	)
 }
 

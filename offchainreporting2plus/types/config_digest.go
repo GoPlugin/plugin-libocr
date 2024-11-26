@@ -1,7 +1,6 @@
 package types
 
 import (
-	"context"
 	"encoding"
 	"encoding/binary"
 	"fmt"
@@ -27,10 +26,6 @@ const (
 	ConfigDigestPrefixEVMS4                  ConfigDigestPrefix = 0x0008 // Run Threshold/S4 plugins as part of another product under one contract.
 	ConfigDigestPrefixLLO                    ConfigDigestPrefix = 0x0009 // Mercury v1
 	ConfigDigestPrefixCCIPMultiRole          ConfigDigestPrefix = 0x000a // CCIP multi role
-	ConfigDigestPrefixCCIPMultiRoleRMN       ConfigDigestPrefix = 0x000b // CCIP multi role RMN
-	ConfigDigestPrefixCCIPMultiRoleRMNCombo  ConfigDigestPrefix = 0x000c // CCIP multi role & RMN combined
-	_                                                           = 0x000d // reserved
-	ConfigDigestPrefixKeystoneOCR3Capability ConfigDigestPrefix = 0x000e
 
 	ConfigDigestPrefixOCR1 ConfigDigestPrefix = 0xEEEE // we translate ocr1 config digest to ocr2 config digests in the networking layer
 	_                      ConfigDigestPrefix = 0xFFFF // reserved for future use
@@ -103,12 +98,12 @@ func (c ConfigDigest) MarshalText() (text []byte, err error) {
 // blockchain node from breaking domain separation between different protocol
 // instances.
 //
-// All its functions should be pure and thread-safe.
+// All its functions should be thread-safe.
 type OffchainConfigDigester interface {
 	// Compute ConfigDigest for the given ContractConfig. The first two bytes of the
 	// ConfigDigest must be the big-endian encoding of ConfigDigestPrefix!
-	ConfigDigest(context.Context, ContractConfig) (ConfigDigest, error)
+	ConfigDigest(ContractConfig) (ConfigDigest, error)
 
 	// This should return the same constant value on every invocation
-	ConfigDigestPrefix(context.Context) (ConfigDigestPrefix, error)
+	ConfigDigestPrefix() (ConfigDigestPrefix, error)
 }

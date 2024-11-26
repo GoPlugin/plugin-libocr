@@ -8,7 +8,6 @@ import (
 	"github.com/goplugin/plugin-libocr/commontypes"
 	"github.com/goplugin/plugin-libocr/internal/loghelper"
 	"github.com/goplugin/plugin-libocr/internal/metricshelper"
-	"github.com/goplugin/plugin-libocr/internal/util"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/config/ocr3config"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/managed/limits"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/mercuryshim"
@@ -61,12 +60,15 @@ func RunManagedMercuryOracle(
 
 		configTracker,
 		database,
-		func(ctx context.Context, logger loghelper.LoggerWithContext, contractConfig types.ContractConfig) (err error, retry bool) {
+		func(ctx context.Context, contractConfig types.ContractConfig, logger loghelper.LoggerWithContext) {
 			skipResourceExhaustionChecks := localConfig.DevelopmentMode == types.EnableDangerousDevelopmentMode
 
-			fromAccount, err := contractTransmitter.FromAccount(ctx)
+			fromAccount, err := contractTransmitter.FromAccount()
 			if err != nil {
-				return fmt.Errorf("ManagedMercuryOracle: error getting FromAccount: %w", err), true
+				logger.Error("ManagedMercuryOracle: error getting FromAccount", commontypes.LogFields{
+					"error": err,
+				})
+				return
 			}
 
 			ocr3OnchainKeyring := mercuryshim.NewMercuryOCR3OnchainKeyring(onchainKeyring)
@@ -80,7 +82,10 @@ func RunManagedMercuryOracle(
 				fromAccount,
 			)
 			if err != nil {
-				return fmt.Errorf("ManagedMercuryOracle: error while decoding ContractConfig: %w", err), false
+				logger.Error("ManagedMercuryOracle: error while updating config", commontypes.LogFields{
+					"error": err,
+				})
+				return
 			}
 
 			// Run with new config
@@ -93,20 +98,7 @@ func RunManagedMercuryOracle(
 				"oid": oid,
 			})
 
-			maxDurationInitialization := util.NilCoalesce(sharedConfig.MaxDurationInitialization, localConfig.DefaultMaxDurationInitialization)
-			initCtx, initCancel := context.WithTimeout(ctx, maxDurationInitialization)
-			defer initCancel()
-
-			ins := loghelper.NewIfNotStopped(
-				maxDurationInitialization+protocol.ReportingPluginTimeoutWarningGracePeriod,
-				func() {
-					logger.Error("ManagedMercuryOracle: MercuryPluginFactory.NewMercuryPlugin is taking too long", commontypes.LogFields{
-						"maxDuration": maxDurationInitialization,
-					})
-				},
-			)
-
-			mercuryPlugin, mercuryPluginInfo, err := mercuryPluginFactory.NewMercuryPlugin(initCtx, ocr3types.MercuryPluginConfig{
+			mercuryPlugin, mercuryPluginInfo, err := mercuryPluginFactory.NewMercuryPlugin(ocr3types.MercuryPluginConfig{
 				sharedConfig.ConfigDigest,
 				oid,
 				sharedConfig.N(),
@@ -116,11 +108,11 @@ func RunManagedMercuryOracle(
 				sharedConfig.MinRoundInterval(),
 				sharedConfig.MaxDurationObservation,
 			})
-
-			ins.Stop()
-
 			if err != nil {
-				return fmt.Errorf("ManagedMercuryOracle: error during NewReportingPlugin(): %w", err), true
+				logger.Error("ManagedMercuryOracle: error during NewReportingPlugin()", commontypes.LogFields{
+					"error": err,
+				})
+				return
 			}
 			defer loghelper.CloseLogError(
 				mercuryPlugin,
@@ -143,7 +135,7 @@ func RunManagedMercuryOracle(
 					"error":             err,
 					"mercuryPluginInfo": mercuryPluginInfo,
 				})
-				return fmt.Errorf("ManagedMercuryOracle: invalid MercuryPluginInfo"), false
+				return
 			}
 
 			reportingPluginLimits := mercuryshim.ReportingPluginLimits(mercuryPluginInfo.Limits)
@@ -156,7 +148,7 @@ func RunManagedMercuryOracle(
 					"reportingPluginLimits": reportingPluginLimits,
 					"maxSigLen":             ocr3OnchainKeyring.MaxSignatureLength(),
 				})
-				return fmt.Errorf("ManagedMercuryOracle: error during limits"), false
+				return
 			}
 			binNetEndpoint, err := netEndpointFactory.NewEndpoint(
 				sharedConfig.ConfigDigest,
@@ -171,7 +163,7 @@ func RunManagedMercuryOracle(
 					"peerIDs":         peerIDs,
 					"v2bootstrappers": v2bootstrappers,
 				})
-				return fmt.Errorf("ManagedMercuryOracle: error during NewEndpoint"), true
+				return
 			}
 
 			// No need to binNetEndpoint.Start/Close since netEndpoint will handle that for us
@@ -182,13 +174,16 @@ func RunManagedMercuryOracle(
 				binNetEndpoint,
 				ocr3OnchainKeyring.MaxSignatureLength(),
 				childLogger,
-				registerer,
 				reportingPluginLimits,
 				sharedConfig.N(),
 				sharedConfig.F,
 			)
 			if err := netEndpoint.Start(); err != nil {
-				return fmt.Errorf("ManagedMercuryOracle: error during netEndpoint.Start(): %w", err), true
+				logger.Error("ManagedMercuryOracle: error during netEndpoint.Start()", commontypes.LogFields{
+					"error":        err,
+					"configDigest": sharedConfig.ConfigDigest,
+				})
+				return
 			}
 			defer loghelper.CloseLogError(
 				netEndpoint,
@@ -231,13 +226,10 @@ func RunManagedMercuryOracle(
 				shim.LimitCheckOCR3ReportingPlugin[mercuryshim.MercuryReportInfo]{reportingPlugin, reportingPluginLimits},
 				shim.MakeOCR3TelemetrySender(chTelemetrySend, childLogger),
 			)
-
-			return nil, false
 		},
 		localConfig,
 		logger,
 		offchainConfigDigester,
-		defaultRetryParams(),
 	)
 }
 

@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/goplugin/plugin-libocr/commontypes"
 	"github.com/goplugin/plugin-libocr/internal/loghelper"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/ocr2/protocol"
@@ -20,7 +19,6 @@ type OCR2SerializingEndpoint struct {
 	configDigest          types.ConfigDigest
 	endpoint              commontypes.BinaryNetworkEndpoint
 	logger                commontypes.Logger
-	metrics               *serializingEndpointMetrics
 	reportingPluginLimits types.ReportingPluginLimits
 
 	mutex        sync.Mutex
@@ -40,7 +38,6 @@ func NewOCR2SerializingEndpoint(
 	configDigest types.ConfigDigest,
 	endpoint commontypes.BinaryNetworkEndpoint,
 	logger commontypes.Logger,
-	metricsRegisterer prometheus.Registerer,
 	reportingPluginLimits types.ReportingPluginLimits,
 ) *OCR2SerializingEndpoint {
 	return &OCR2SerializingEndpoint{
@@ -48,8 +45,8 @@ func NewOCR2SerializingEndpoint(
 		configDigest,
 		endpoint,
 		logger,
-		newSerializingEndpointMetrics(metricsRegisterer, logger),
 		reportingPluginLimits,
+
 		sync.Mutex{},
 		subprocesses.Subprocesses{},
 		false,
@@ -64,14 +61,12 @@ func NewOCR2SerializingEndpoint(
 func (n *OCR2SerializingEndpoint) sendTelemetry(t *serialization.TelemetryWrapper) {
 	select {
 	case n.chTelemetry <- t:
-		n.metrics.sentMessagesTotal.Inc()
 		n.taper.Reset(func(oldCount uint64) {
 			n.logger.Info("OCR2SerializingEndpoint: stopped dropping telemetry", commontypes.LogFields{
 				"droppedCount": oldCount,
 			})
 		})
 	default:
-		n.metrics.droppedMessagesTotal.Inc()
 		n.taper.Trigger(func(newCount uint64) {
 			n.logger.Warn("OCR2SerializingEndpoint: dropping telemetry", commontypes.LogFields{
 				"droppedCount": newCount,
@@ -195,10 +190,7 @@ func (n *OCR2SerializingEndpoint) Close() error {
 			close(n.chOut)
 		}
 
-		err := n.endpoint.Close()
-		n.metrics.Close()
-
-		return err
+		return n.endpoint.Close()
 	}
 
 	return nil

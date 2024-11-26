@@ -9,7 +9,6 @@ import (
 	"github.com/goplugin/plugin-libocr/internal/loghelper"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/ocr3types"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
-	"github.com/goplugin/plugin-libocr/quorumhelper"
 )
 
 type MercuryReportInfo struct {
@@ -97,8 +96,8 @@ func (t *MercuryOCR3ContractTransmitter) Transmit(
 	)
 }
 
-func (t *MercuryOCR3ContractTransmitter) FromAccount(ctx context.Context) (types.Account, error) {
-	return t.ocr2ContractTransmitter.FromAccount(ctx)
+func (t *MercuryOCR3ContractTransmitter) FromAccount() (types.Account, error) {
+	return t.ocr2ContractTransmitter.FromAccount()
 }
 
 func ocr3MaxOutcomeLength(maxReportLength int) int {
@@ -168,10 +167,8 @@ func (p *MercuryReportingPlugin) Observation(ctx context.Context, outctx ocr3typ
 		return nil, err
 	}
 
-	observationCtx, observationCancel := context.WithTimeout(ctx, p.Config.MaxDurationObservation)
-	defer observationCancel()
 	//nolint:staticcheck
-	observation, err := p.Plugin.Observation(observationCtx, types.ReportTimestamp{p.Config.ConfigDigest, uint32(outctx.Epoch), uint8(outctx.Round)}, previousOutcomeDeserialized.Report)
+	observation, err := p.Plugin.Observation(ctx, types.ReportTimestamp{p.Config.ConfigDigest, uint32(outctx.Epoch), uint8(outctx.Round)}, previousOutcomeDeserialized.Report)
 	if err != nil {
 		return nil, err
 	}
@@ -183,15 +180,15 @@ func (p *MercuryReportingPlugin) Observation(ctx context.Context, outctx ocr3typ
 	return observation, nil
 }
 
-func (p *MercuryReportingPlugin) ValidateObservation(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation) error {
+func (p *MercuryReportingPlugin) ValidateObservation(outctx ocr3types.OutcomeContext, query types.Query, ao types.AttributedObservation) error {
 	return nil
 }
 
-func (p *MercuryReportingPlugin) ObservationQuorum(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (bool, error) {
-	return quorumhelper.ObservationCountReachesObservationQuorum(quorumhelper.QuorumTwoFPlusOne, p.Config.N, p.Config.F, aos), nil
+func (p *MercuryReportingPlugin) ObservationQuorum(outctx ocr3types.OutcomeContext, query types.Query) (ocr3types.Quorum, error) {
+	return ocr3types.QuorumTwoFPlusOne, nil
 }
 
-func (p *MercuryReportingPlugin) Outcome(ctx context.Context, outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
+func (p *MercuryReportingPlugin) Outcome(outctx ocr3types.OutcomeContext, query types.Query, aos []types.AttributedObservation) (ocr3types.Outcome, error) {
 	p.Logger.Debug("MercuryReportingPlugin: Outcome", commontypes.LogFields{
 		"seqNr": outctx.SeqNr,
 		"epoch": outctx.Epoch, // nolint: staticcheck
@@ -204,7 +201,7 @@ func (p *MercuryReportingPlugin) Outcome(ctx context.Context, outctx ocr3types.O
 	}
 
 	//nolint:staticcheck
-	shouldReport, report, err := p.Plugin.Report(ctx, types.ReportTimestamp{p.Config.ConfigDigest, uint32(outctx.Epoch), uint8(outctx.Round)}, previousOutcomeDeserialized.Report, aos)
+	shouldReport, report, err := p.Plugin.Report(types.ReportTimestamp{p.Config.ConfigDigest, uint32(outctx.Epoch), uint8(outctx.Round)}, previousOutcomeDeserialized.Report, aos)
 	if err != nil {
 		return nil, err
 	}
@@ -222,7 +219,7 @@ func (p *MercuryReportingPlugin) Outcome(ctx context.Context, outctx ocr3types.O
 	return serializeMercuryReportingPluginOutcome(outcomeDeserialized), nil
 }
 
-func (p *MercuryReportingPlugin) Reports(ctx context.Context, seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportPlus[MercuryReportInfo], error) {
+func (p *MercuryReportingPlugin) Reports(seqNr uint64, outcome ocr3types.Outcome) ([]ocr3types.ReportWithInfo[MercuryReportInfo], error) {
 	outcomeDeserialized, err := deserializeMercuryReportingPluginOutcome(outcome)
 	if err != nil {
 		return nil, err
@@ -230,15 +227,12 @@ func (p *MercuryReportingPlugin) Reports(ctx context.Context, seqNr uint64, outc
 
 	if outcomeDeserialized.ShouldReport {
 		//nolint:staticcheck
-		return []ocr3types.ReportPlus[MercuryReportInfo]{{
-			ocr3types.ReportWithInfo[MercuryReportInfo]{
-				outcomeDeserialized.Report,
-				MercuryReportInfo{
-					outcomeDeserialized.Epoch,
-					outcomeDeserialized.Round,
-				},
+		return []ocr3types.ReportWithInfo[MercuryReportInfo]{{
+			outcomeDeserialized.Report,
+			MercuryReportInfo{
+				outcomeDeserialized.Epoch,
+				outcomeDeserialized.Round,
 			},
-			nil,
 		}}, nil
 	} else {
 		return nil, nil

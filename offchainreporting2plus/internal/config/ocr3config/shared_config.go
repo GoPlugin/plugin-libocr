@@ -3,7 +3,7 @@ package ocr3config
 import (
 	"bytes"
 	"crypto/hmac"
-	"crypto/rand"
+	cryptorand "crypto/rand"
 	"crypto/sha256"
 	"fmt"
 	"math"
@@ -15,7 +15,6 @@ import (
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/config/ethcontractconfig"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/ocr3types"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
-	"golang.org/x/crypto/curve25519"
 )
 
 // SharedConfig is the configuration shared by all oracles running an instance
@@ -106,10 +105,9 @@ func SharedConfigFromContractConfig[RI any](
 
 }
 
-func ContractSetConfigArgsFromSharedConfigDeterministic(
+func XXXContractSetConfigArgsFromSharedConfig(
 	c SharedConfig,
 	sharedSecretEncryptionPublicKeys []types.ConfigEncryptionPublicKey,
-	ephemeralSk *[curve25519.ScalarSize]byte,
 ) (
 	signers []types.OnchainPublicKey,
 	transmitters []types.Account,
@@ -127,14 +125,9 @@ func ContractSetConfigArgsFromSharedConfigDeterministic(
 		offChainPublicKeys = append(offChainPublicKeys, identity.OffchainPublicKey)
 		peerIDs = append(peerIDs, identity.PeerID)
 	}
-	sharedSecretEncryptions, err := config.EncryptSharedSecretDeterministic(
-		sharedSecretEncryptionPublicKeys,
-		c.SharedSecret,
-		ephemeralSk,
-	)
-	if err != nil {
-		return nil, nil, 0, nil, 0, nil, err
-	}
+	f = uint8(c.F)
+	onchainConfig = c.OnchainConfig
+	offchainConfigVersion = config.OCR3OffchainConfigVersion
 	offchainConfig_ = (offchainConfig{
 		c.DeltaProgress,
 		c.DeltaResend,
@@ -148,14 +141,18 @@ func ContractSetConfigArgsFromSharedConfigDeterministic(
 		offChainPublicKeys,
 		peerIDs,
 		c.ReportingPluginConfig,
-		c.MaxDurationInitialization,
 		c.MaxDurationQuery,
 		c.MaxDurationObservation,
 		c.MaxDurationShouldAcceptAttestedReport,
 		c.MaxDurationShouldTransmitAcceptedReport,
-		sharedSecretEncryptions,
+		config.XXXEncryptSharedSecret(
+			sharedSecretEncryptionPublicKeys,
+			c.SharedSecret,
+			cryptorand.Reader,
+		),
 	}).serialize()
-	return signers, transmitters, uint8(c.F), c.OnchainConfig, config.OCR3OffchainConfigVersion, offchainConfig_, nil
+	err = nil
+	return
 }
 
 func XXXContractSetConfigArgsFromSharedConfigEthereum(
@@ -165,13 +162,8 @@ func XXXContractSetConfigArgsFromSharedConfigEthereum(
 	setConfigArgs ethcontractconfig.SetConfigArgs,
 	err error,
 ) {
-	ephemeralSk := [curve25519.ScalarSize]byte{}
-	if _, err := rand.Read(ephemeralSk[:]); err != nil {
-		return ethcontractconfig.SetConfigArgs{}, err
-	}
-
 	signerOnchainPublicKeys, transmitterAccounts, f, onchainConfig, offchainConfigVersion, offchainConfig, err :=
-		ContractSetConfigArgsFromSharedConfigDeterministic(c, sharedSecretEncryptionPublicKeys, &ephemeralSk)
+		XXXContractSetConfigArgsFromSharedConfig(c, sharedSecretEncryptionPublicKeys)
 	if err != nil {
 		return ethcontractconfig.SetConfigArgs{}, err
 	}

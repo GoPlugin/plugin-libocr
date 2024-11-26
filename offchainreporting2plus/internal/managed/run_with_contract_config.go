@@ -2,35 +2,12 @@ package managed
 
 import (
 	"context"
-	"math/rand"
-	"time"
 
 	"github.com/goplugin/plugin-libocr/commontypes"
 	"github.com/goplugin/plugin-libocr/internal/loghelper"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
 	"github.com/goplugin/plugin-libocr/subprocesses"
 )
-
-// A retriableFn is a function that is managed by runWithContractConfig.
-// On error, it can indicate whether it would like to be retried automatically
-// via the the retry bool. If err is nil, retry is ignored.
-type retriableFn func(context.Context, loghelper.LoggerWithContext, types.ContractConfig) (err error, retry bool)
-
-type retryParams struct {
-	InitialSleep      time.Duration
-	SleepMultiplier   float64       // should be greater than 1 to achieve exponential backoff
-	MaxRelativeJitter float64       // keep this between 0 and 1
-	MaxSleep          time.Duration // sleep will never be longer than this
-}
-
-func defaultRetryParams() retryParams {
-	return retryParams{
-		InitialSleep:      time.Second,
-		SleepMultiplier:   2,
-		MaxRelativeJitter: 0.1,
-		MaxSleep:          2 * time.Minute,
-	}
-}
 
 // runWithContractConfig runs fn with a contractConfig and manages its lifecycle
 // as contractConfigs change according to contractConfigTracker. It also saves
@@ -40,11 +17,10 @@ func runWithContractConfig(
 
 	contractConfigTracker types.ContractConfigTracker,
 	database types.ConfigDatabase,
-	fn retriableFn,
+	fn func(context.Context, types.ContractConfig, loghelper.LoggerWithContext),
 	localConfig types.LocalConfig,
 	logger loghelper.LoggerWithContext,
 	offchainConfigDigester types.OffchainConfigDigester,
-	retryParams retryParams,
 ) {
 	rwcc := runWithContractConfigState{
 		ctx,
@@ -55,7 +31,6 @@ func runWithContractConfig(
 		fn,
 		localConfig,
 		logger,
-		retryParams,
 
 		prefixCheckConfigDigester{offchainConfigDigester},
 		func() {},
@@ -71,10 +46,9 @@ type runWithContractConfigState struct {
 	configDigest          types.ConfigDigest
 	contractConfigTracker types.ContractConfigTracker
 	database              types.ConfigDatabase
-	fn                    retriableFn
+	fn                    func(context.Context, types.ContractConfig, loghelper.LoggerWithContext)
 	localConfig           types.LocalConfig
 	logger                loghelper.LoggerWithContext
-	retryParams           retryParams
 
 	configDigester prefixCheckConfigDigester
 	fnCancel       context.CancelFunc
@@ -135,7 +109,6 @@ func (rwcc *runWithContractConfigState) restoreFromDatabase() {
 	rwcc.configChanged(*contractConfig)
 }
 
-// We assume that contractConfig has already been validated by the OffchainConfigDigester.
 func (rwcc *runWithContractConfigState) configChanged(contractConfig types.ContractConfig) {
 	// Cease any operation from earlier configs
 	rwcc.logger.Info("runWithContractConfig: winding down old configuration", commontypes.LogFields{
@@ -149,15 +122,26 @@ func (rwcc *runWithContractConfigState) configChanged(contractConfig types.Contr
 		"newConfigDigest": contractConfig.ConfigDigest,
 	})
 
-	rwcc.configDigest = contractConfig.ConfigDigest
+	// note that there is an analogous check in TrackConfig, so this should never trigger.
+	if err := rwcc.configDigester.CheckContractConfig(contractConfig); err != nil {
+		rwcc.logger.Error("runWithContractConfig: detected corruption while attempting to change configuration", commontypes.LogFields{
+			"err":            err,
+			"contractConfig": contractConfig,
+		})
+		return
+	}
 
-	logger := rwcc.logger.MakeChild(commontypes.LogFields{"configDigest": contractConfig.ConfigDigest})
+	rwcc.configDigest = contractConfig.ConfigDigest
 
 	fnCtx, fnCancel := context.WithCancel(rwcc.ctx)
 	rwcc.fnCancel = fnCancel
 	rwcc.fnSubs.Go(func() {
 		defer fnCancel()
-		retryOnError(fnCtx, logger, rwcc.retryParams, contractConfig, rwcc.fn)
+		rwcc.fn(
+			fnCtx,
+			contractConfig,
+			rwcc.logger.MakeChild(commontypes.LogFields{"configDigest": contractConfig.ConfigDigest}),
+		)
 	})
 
 	writeCtx, writeCancel := context.WithTimeout(rwcc.ctx, rwcc.localConfig.DatabaseTimeout)
@@ -170,45 +154,4 @@ func (rwcc *runWithContractConfigState) configChanged(contractConfig types.Contr
 		})
 	}
 
-}
-
-func retryOnError(ctx context.Context, logger loghelper.LoggerWithContext, retryParams retryParams, contractConfig types.ContractConfig, fn retriableFn) {
-	sleep := retryParams.InitialSleep
-
-	for retry := 0; ; retry++ {
-		retryLogger := logger.MakeChild(commontypes.LogFields{"retry": retry})
-		retryLogger.Info("runWithContractConfig: running function", nil)
-		// We intentionally don't pass retryLogger to fn, because we don't want to include the "retry"
-		// in every log line logged from fn.
-		err, retry := fn(ctx, logger, contractConfig)
-		if err == nil {
-			retryLogger.Info("runWithContractConfig: function exited without error. not retrying", nil)
-			return
-		}
-		if !retry {
-			retryLogger.ErrorIfNotCanceled("runWithContractConfig: function exited with non-retriable error. not retrying", ctx, commontypes.LogFields{
-				"error": err,
-			})
-			return
-		}
-		retryLogger.ErrorIfNotCanceled("runWithContractConfig: function returned error. sleeping before retrying", ctx, commontypes.LogFields{
-			"error": err,
-			"sleep": sleep.String(),
-		})
-
-		select {
-		case <-time.After(sleep):
-		case <-ctx.Done():
-			retryLogger.Info("runWithContractConfig: context expired while sleeping before retrying. not retrying", nil)
-			return
-		}
-
-		sleep = time.Duration(float64(sleep) * retryParams.SleepMultiplier)
-		if sleep > retryParams.MaxSleep {
-			sleep = retryParams.MaxSleep
-		}
-		// Subtract jitter so we always respect MaxSleep
-		jitterFactor := 1 - rand.Float64()*retryParams.MaxRelativeJitter
-		sleep = time.Duration(float64(sleep) * jitterFactor)
-	}
 }

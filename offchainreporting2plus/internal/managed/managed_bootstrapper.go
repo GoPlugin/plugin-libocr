@@ -2,7 +2,6 @@ package managed
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/goplugin/plugin-libocr/commontypes"
 	"github.com/goplugin/plugin-libocr/internal/loghelper"
@@ -28,10 +27,13 @@ func RunManagedBootstrapper(
 
 		contractConfigTracker,
 		database,
-		func(ctx context.Context, logger loghelper.LoggerWithContext, contractConfig types.ContractConfig) (err error, retry bool) {
+		func(ctx context.Context, contractConfig types.ContractConfig, logger loghelper.LoggerWithContext) {
 			config, err := netconfig.NetConfigFromContractConfig(contractConfig)
 			if err != nil {
-				return fmt.Errorf("ManagedBootstrapper: error while decoding ContractConfig: %w", err), false
+				logger.Error("ManagedBootstrapper: error while decoding ContractConfig", commontypes.LogFields{
+					"error": err,
+				})
+				return
 			}
 
 			bootstrapper, err := bootstrapperFactory.NewBootstrapper(config.ConfigDigest, config.PeerIDs, v2bootstrappers, config.F)
@@ -41,11 +43,14 @@ func RunManagedBootstrapper(
 					"peerIDs":         config.PeerIDs,
 					"v2bootstrappers": v2bootstrappers,
 				})
-				return fmt.Errorf("ManagedBootstrapper: error during NewBootstrapper: %w", err), true
+				return
 			}
 
 			if err := bootstrapper.Start(); err != nil {
-				return fmt.Errorf("ManagedBootstrapper: error during bootstrapper.Start(): %w", err), true
+				logger.Error("ManagedBootstrapper: error during bootstrapper.Start()", commontypes.LogFields{
+					"error": err,
+				})
+				return
 			}
 			defer loghelper.CloseLogError(
 				bootstrapper,
@@ -54,12 +59,9 @@ func RunManagedBootstrapper(
 			)
 
 			<-ctx.Done()
-
-			return nil, false
 		},
 		localConfig,
 		logger,
 		offchainConfigDigester,
-		defaultRetryParams(),
 	)
 }

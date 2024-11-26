@@ -76,21 +76,11 @@ type PublicConfig struct {
 	// MaxDurationX is the maximum duration a ReportingPlugin should spend
 	// performing X. Reasonable values for these will be specific to each
 	// ReportingPlugin. Be sure to not set these too short, or the corresponding
-	// ReportingPlugin function may always time out. The logic for
-	// MaxDurationQuery and MaxDurationObservation has changed since these
-	// values were first introduced. Unlike the other MaxDurationX values,
-	// exceeding MaxDurationQuery and MaxDurationObservation will only cause
-	// warnings to be logged, but will *not* cause X to time out.
-	//
-	// These values are passed to the ReportingPlugin during initialization.
-	// Consequently, the ReportingPlugin may exhibit specific behaviors based on
-	// these values. For instance, the MercuryReportingPlugin uses
-	// MaxDurationObservation to set context timeouts.
-	MaxDurationInitialization               *time.Duration // Context deadline passed to NewReportingPlugin. If this is nil, LocalConfig.DefaultMaxDurationInitialization will be used instead.
-	MaxDurationQuery                        time.Duration  // If the Query function takes longer than this, a warning will be logged.
-	MaxDurationObservation                  time.Duration  // If the Observation function takes longer than this, a warning will be logged.
-	MaxDurationShouldAcceptAttestedReport   time.Duration  // Context deadline passed to ShouldAcceptAttestedReport.
-	MaxDurationShouldTransmitAcceptedReport time.Duration  // Context deadline passed to ShouldTransmitAcceptedReport.
+	// ReportingPlugin function may always time out.
+	MaxDurationQuery                        time.Duration
+	MaxDurationObservation                  time.Duration
+	MaxDurationShouldAcceptAttestedReport   time.Duration
+	MaxDurationShouldTransmitAcceptedReport time.Duration
 
 	// The maximum number of oracles that are assumed to be faulty while the
 	// protocol can retain liveness and safety. Unless you really know what
@@ -176,7 +166,6 @@ func publicConfigFromContractConfig(skipResourceExhaustionChecks bool, change ty
 		oc.S,
 		identities,
 		oc.ReportingPluginConfig,
-		oc.MaxDurationInitialization,
 		oc.MaxDurationQuery,
 		oc.MaxDurationObservation,
 		oc.MaxDurationShouldAcceptAttestedReport,
@@ -340,9 +329,10 @@ func checkPublicConfigParameters(cfg PublicConfig) error {
 			cfg.DeltaRound, cfg.DeltaProgress)
 	}
 
-	if !(cfg.DeltaGrace < cfg.DeltaProgress) {
-		return fmt.Errorf("DeltaGrace (%v) must be less than DeltaProgress (%v)",
-			cfg.DeltaGrace, cfg.DeltaProgress)
+	sumMaxDurationsOutcomeGeneration := cfg.MaxDurationQuery + cfg.MaxDurationObservation + cfg.DeltaGrace
+	if !(sumMaxDurationsOutcomeGeneration < cfg.DeltaProgress) {
+		return fmt.Errorf("sum of MaxDurationQuery/MaxDurationObservation/DeltaGrace (%v) must be less than DeltaProgress (%v)",
+			sumMaxDurationsOutcomeGeneration, cfg.DeltaProgress)
 	}
 
 	// We cannot easily add a similar check for the MaxDuration variables used

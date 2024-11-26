@@ -6,7 +6,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/prometheus/client_golang/prometheus"
 	"github.com/goplugin/plugin-libocr/commontypes"
 	"github.com/goplugin/plugin-libocr/internal/loghelper"
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/internal/ocr3/protocol"
@@ -22,7 +21,6 @@ type OCR3SerializingEndpoint[RI any] struct {
 	endpoint     commontypes.BinaryNetworkEndpoint
 	maxSigLen    int
 	logger       commontypes.Logger
-	metrics      *serializingEndpointMetrics
 	pluginLimits ocr3types.ReportingPluginLimits
 	n, f         int
 
@@ -44,7 +42,6 @@ func NewOCR3SerializingEndpoint[RI any](
 	endpoint commontypes.BinaryNetworkEndpoint,
 	maxSigLen int,
 	logger commontypes.Logger,
-	metricsRegisterer prometheus.Registerer,
 	pluginLimits ocr3types.ReportingPluginLimits,
 	n, f int,
 ) *OCR3SerializingEndpoint[RI] {
@@ -54,7 +51,6 @@ func NewOCR3SerializingEndpoint[RI any](
 		endpoint,
 		maxSigLen,
 		logger,
-		newSerializingEndpointMetrics(metricsRegisterer, logger),
 		pluginLimits,
 		n, f,
 
@@ -72,14 +68,12 @@ func NewOCR3SerializingEndpoint[RI any](
 func (n *OCR3SerializingEndpoint[RI]) sendTelemetry(t *serialization.TelemetryWrapper) {
 	select {
 	case n.chTelemetry <- t:
-		n.metrics.sentMessagesTotal.Inc()
 		n.taper.Reset(func(oldCount uint64) {
 			n.logger.Info("OCR3SerializingEndpoint: stopped dropping telemetry", commontypes.LogFields{
 				"droppedCount": oldCount,
 			})
 		})
 	default:
-		n.metrics.droppedMessagesTotal.Inc()
 		n.taper.Trigger(func(newCount uint64) {
 			n.logger.Warn("OCR3SerializingEndpoint: dropping telemetry", commontypes.LogFields{
 				"droppedCount": newCount,
@@ -106,7 +100,7 @@ func (n *OCR3SerializingEndpoint[RI]) serialize(msg protocol.Message[RI]) ([]byt
 }
 
 func (n *OCR3SerializingEndpoint[RI]) deserialize(raw []byte) (protocol.Message[RI], *serialization.MessageWrapper, error) {
-	m, pbm, err := serialization.Deserialize[RI](n.n, raw)
+	m, pbm, err := serialization.Deserialize[RI](raw)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -202,10 +196,7 @@ func (n *OCR3SerializingEndpoint[RI]) Close() error {
 			close(n.chOut)
 		}
 
-		err := n.endpoint.Close()
-		n.metrics.Close()
-
-		return err
+		return n.endpoint.Close()
 	}
 
 	return nil

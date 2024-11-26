@@ -561,14 +561,14 @@ contract OffchainAggregatorBilling is Owned {
   {
     require(msg.sender == owner || s_billingAccessController.hasAccess(msg.sender, msg.data),
       "Only owner&billingAdmin can call");
-    uint256 linkDue = totalPLIDue();
+    uint256 linkDue = totalLINKDue();
     uint256 linkBalance = s_linkToken.balanceOf(address(this));
     require(linkBalance >= linkDue, "insufficient balance");
     require(s_linkToken.transfer(_recipient, min(linkBalance - linkDue, _amount)), "insufficient funds");
   }
 
   // Total PLI due to participants in past reports.
-  function totalPLIDue()
+  function totalLINKDue()
     internal
     view
     returns (uint256 linkDue)
@@ -608,9 +608,9 @@ contract OffchainAggregatorBilling is Owned {
   {
     // there are at most one billion PLI, so this cast is safe
     int256 balance = int256(s_linkToken.balanceOf(address(this)));
-    // according to the argument in the definition of totalPLIDue,
-    // totalPLIDue is never greater than 2**172, so this cast is safe
-    int256 due = int256(totalPLIDue());
+    // according to the argument in the definition of totalLINKDue,
+    // totalLINKDue is never greater than 2**172, so this cast is safe
+    int256 due = int256(totalLINKDue());
     // safe from overflow according to above sizes
     return int256(balance) - int256(due);
   }

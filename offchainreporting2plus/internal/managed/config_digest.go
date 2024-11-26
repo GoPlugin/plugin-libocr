@@ -1,7 +1,6 @@
 package managed
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/goplugin/plugin-libocr/offchainreporting2plus/types"
@@ -14,13 +13,13 @@ type prefixCheckConfigDigester struct {
 
 // ConfigDigest method that checks that the computed ConfigDigest's prefix is
 // consistent with OffchainConfigDigester.ConfigDigestPrefix
-func (d prefixCheckConfigDigester) ConfigDigest(ctx context.Context, cc types.ContractConfig) (types.ConfigDigest, error) {
-	prefix, err := d.offchainConfigDigester.ConfigDigestPrefix(ctx)
+func (d prefixCheckConfigDigester) ConfigDigest(cc types.ContractConfig) (types.ConfigDigest, error) {
+	prefix, err := d.offchainConfigDigester.ConfigDigestPrefix()
 	if err != nil {
 		return types.ConfigDigest{}, err
 	}
 
-	cd, err := d.offchainConfigDigester.ConfigDigest(ctx, cc)
+	cd, err := d.offchainConfigDigester.ConfigDigest(cc)
 	if err != nil {
 		return types.ConfigDigest{}, err
 	}
@@ -34,8 +33,8 @@ func (d prefixCheckConfigDigester) ConfigDigest(ctx context.Context, cc types.Co
 
 // Check that the ContractConfig's ConfigDigest matches the one computed
 // offchain
-func (d prefixCheckConfigDigester) CheckContractConfig(ctx context.Context, cc types.ContractConfig) error {
-	goodConfigDigest, err := d.ConfigDigest(ctx, cc)
+func (d prefixCheckConfigDigester) CheckContractConfig(cc types.ContractConfig) error {
+	goodConfigDigest, err := d.ConfigDigest(cc)
 	if err != nil {
 		return err
 	}

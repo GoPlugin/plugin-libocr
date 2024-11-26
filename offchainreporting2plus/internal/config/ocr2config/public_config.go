@@ -65,7 +65,6 @@ type PublicConfig struct {
 	// performing X. Reasonable values for these will be specific to each
 	// ReportingPlugin. Be sure to not set these too short, or the corresponding
 	// ReportingPlugin function may always time out.
-	MaxDurationInitialization               *time.Duration // Used for NewReportingPlugin()
 	MaxDurationQuery                        time.Duration
 	MaxDurationObservation                  time.Duration // Used to be an environment variable called OCR_OBSERVATION_TIMEOUT in OCR1 in the Plugin node.
 	MaxDurationReport                       time.Duration
@@ -143,7 +142,6 @@ func publicConfigFromContractConfig(skipResourceExhaustionChecks bool, change ty
 		oc.S,
 		identities,
 		oc.ReportingPluginConfig,
-		oc.MaxDurationInitialization,
 		oc.MaxDurationQuery,
 		oc.MaxDurationObservation,
 		oc.MaxDurationReport,

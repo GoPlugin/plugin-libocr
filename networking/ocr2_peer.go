@@ -24,6 +24,7 @@ func (o *ocr2BinaryNetworkEndpointFactory) NewEndpoint(
 		configDigest,
 		pids,
 		v2bootstrappers,
+		f,
 		BinaryNetworkEndpointLimits(limits),
 	)
 }
@@ -38,5 +39,6 @@ func (o *ocr2BootstrapperFactory) NewBootstrapper(
 		configDigest,
 		peerIDs,
 		v2bootstrappers,
+		f,
 	)
 }

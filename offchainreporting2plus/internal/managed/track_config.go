@@ -88,20 +88,21 @@ func (state *trackConfigState) checkLatestConfigDetails() (
 	latestConfigDetails *types.ContractConfig,
 	awaitingConfirmation bool,
 ) {
-	ctx, cancel := context.WithTimeout(state.ctx, state.localConfig.ContractConfigLoadTimeout)
-	defer cancel()
-
-	blockheight, err := state.configTracker.LatestBlockHeight(ctx)
+	bhCtx, bhCancel := context.WithTimeout(state.ctx, state.localConfig.BlockchainTimeout)
+	defer bhCancel()
+	blockheight, err := state.configTracker.LatestBlockHeight(bhCtx)
 	if err != nil {
-		state.logger.ErrorIfNotCanceled("TrackConfig: error during LatestBlockHeight()", ctx, commontypes.LogFields{
+		state.logger.ErrorIfNotCanceled("TrackConfig: error during LatestBlockHeight()", bhCtx, commontypes.LogFields{
 			"error": err,
 		})
 		return nil, false
 	}
 
-	changedInBlock, latestConfigDigest, err := state.configTracker.LatestConfigDetails(ctx)
+	detailsCtx, detailsCancel := context.WithTimeout(state.ctx, state.localConfig.BlockchainTimeout)
+	defer detailsCancel()
+	changedInBlock, latestConfigDigest, err := state.configTracker.LatestConfigDetails(detailsCtx)
 	if err != nil {
-		state.logger.ErrorIfNotCanceled("TrackConfig: error during LatestConfigDetails()", ctx, commontypes.LogFields{
+		state.logger.ErrorIfNotCanceled("TrackConfig: error during LatestConfigDetails()", detailsCtx, commontypes.LogFields{
 			"error": err,
 		})
 		return nil, false
@@ -118,10 +119,11 @@ func (state *trackConfigState) checkLatestConfigDetails() (
 	if !state.localConfig.SkipContractConfigConfirmations && blockheight < changedInBlock+uint64(state.localConfig.ContractConfigConfirmations)-1 {
 		return nil, true
 	}
-
-	contractConfig, err := state.configTracker.LatestConfig(ctx, changedInBlock)
+	configCtx, configCancel := context.WithTimeout(state.ctx, state.localConfig.BlockchainTimeout)
+	defer configCancel()
+	contractConfig, err := state.configTracker.LatestConfig(configCtx, changedInBlock)
 	if err != nil {
-		state.logger.ErrorIfNotCanceled("TrackConfig: error during LatestConfigDetails()", ctx, commontypes.LogFields{
+		state.logger.ErrorIfNotCanceled("TrackConfig: error during LatestConfigDetails()", configCtx, commontypes.LogFields{
 			"error": err,
 		})
 		return nil, true
@@ -138,8 +140,8 @@ func (state *trackConfigState) checkLatestConfigDetails() (
 
 	// Ignore configs where the configDigest doesn't match, they might have
 	// been corrupted somehow.
-	if err := state.configDigester.CheckContractConfig(ctx, contractConfig); err != nil {
-		state.logger.ErrorIfNotCanceled("TrackConfig: configDigester returned error, likely due to a corrupted contractConfig", state.ctx, commontypes.LogFields{
+	if err := state.configDigester.CheckContractConfig(contractConfig); err != nil {
+		state.logger.Error("TrackConfig: received corrupted config change", commontypes.LogFields{
 			"error":          err,
 			"contractConfig": contractConfig,
 		})
@@ -149,8 +151,6 @@ func (state *trackConfigState) checkLatestConfigDetails() (
 	return &contractConfig, false
 }
 
-// Uses configTracker to track the latest configuration. When a new configuration is detected, it
-// is validated with configDigester and sent to chChanges.
 func TrackConfig(
 	ctx context.Context,
 
